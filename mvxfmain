@@ -1,0 +1,62 @@
+#! /bin/sh
+
+#版本号
+versionCode=$1
+echo "versionCode:"$versionCode
+# 资源目录
+sourcePath=$2
+echo "sourcePath:"$sourcePath
+
+obbSize=$(stat -f%z "$sourcePath")
+echo "obbSize = $obbSize bytes."
+
+
+storage=$(adb shell "echo \$EXTERNAL_STORAGE")
+echo "storage="$storage
+
+obb_file="main."${versionCode}".com.ministone.game.risingsuperchef2.obb"
+echo "obb_file: "$obb_file
+
+src_file=$storage"/"$obb_file
+echo "src_file: "$src_file
+
+dest_dir=${storage}"/Android/obb/com.ministone.game.risingsuperchef2/"
+echo "dest_dir: "$dest_dir
+
+
+# adb shell ls $dest_dir$obb_file > "/dev/null 2>&1 && echo "YES" || echo "NO""
+
+# if[ -d $dest_dir$]
+
+
+#         cmdOutput = new ByteArrayOutputStream()
+#         exec{
+#             commandLine adb, "shell", "ls", dest_dir + obb_file, '> /dev/null 2>&1 && echo "YES" || echo "NO"'
+#             standardOutput = cmdOutput
+#         }
+#         def obb_file_exists = cmdOutput.toString().trim()
+#         if (obb_file_exists == "YES"){
+#             def size_output = new ByteArrayOutputStream()
+#             exec{
+#                 commandLine adb, "shell", "stat -c %s", dest_dir + obb_file
+#                 standardOutput = size_output
+#             }
+#             size_output = size_output.toString().trim()
+#             if (size_output == '' + obb_size){
+#                 println 'OBB File already exists'
+#                 return
+#             }
+#         }
+
+#         exec {
+#             commandLine adb, "push", local_file, src_file
+#         }
+#         exec{
+#             commandLine adb, "shell", "mkdir", "-p", dest_dir
+#         }
+#         exec{
+#             commandLine adb, "shell", "mv", src_file, dest_dir
+#         }
+
+
+

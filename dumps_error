@@ -1,0 +1,31 @@
+#!/usr/local/bin/python3
+# coding=utf-8
+
+import os,sys
+import subprocess
+
+if len(sys.argv) < 2:
+	print('Param Error: \n\tdumps_error <Target directory>')
+	sys.exit(1)
+
+dir_path = sys.argv[1]
+if not os.path.exists(dir_path) or not os.path.isdir(dir_path):
+	print('Error : Target directory not exists or not a directory')
+	sys.exit(1)
+
+g = os.walk(dir_path)
+
+for path, dir_list, file_list in g:
+    for file_name in file_list:
+        if file_name.startswith('e'):
+            file_path = os.path.join(path, file_name)
+            # print(file_path)
+            # a,b = commands.getstatusoutput('ndk-stack -sym %s -dumps %s' % (dir_path, file_path))
+            command = 'ndk-stack -sym %s -dump %s' % (dir_path, file_path)
+            print(command)
+            result = subprocess.getstatusoutput(command)
+            # print(result)
+            # print('file:%s, result:%d' % (file_name, result[0]))
+            print(result[1])
+            print('-----------\n')
+

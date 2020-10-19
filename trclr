@@ -1,0 +1,189 @@
+#!/usr/local/bin/python3
+# -*- coding: UTF-8 -*-
+
+import zipfile
+import os, sys, shutil
+
+import csv
+import openpyxl
+from openpyxl.styles import Font, NamedStyle, Alignment, Border, Side, PatternFill
+
+"""
+    1.将下载回来的zip文件解压，并按照语言分类
+    2.读取所有解压出来的csv文件，或者获取数据
+    3.根据获取的数据，生成excel文件
+"""
+
+# 解压文件夹
+def un_zip(zipfile_name):
+    """unzip zip file"""
+    zip_file = zipfile.ZipFile(zipfile_name)
+
+    file_name = os.path.splitext(zipfile_name)[0]
+    if os.path.isdir(file_name):
+        index = 1
+        while os.path.isdir(file_name + "_%d" % index):
+            index += 1
+        file_name += "_%d" % index
+        os.mkdir(file_name)
+    else:
+        os.mkdir(file_name)
+
+    for names in zip_file.namelist():
+        zip_file.extract(names, file_name)
+    zip_file.close()
+
+    return file_name
+
+
+def clear(result_dir_path, unzip_files_path, lang_code):
+    # 将解压后的文件里面的内容整理到指定目录
+    file_list = os.listdir(unzip_files_path)
+    for file_obj in file_list:
+        file_name, file_ext = os.path.splitext(file_obj)
+
+        new_dir_path = os.path.join(result_dir_path, file_name)
+        if not os.path.isdir(new_dir_path):
+            os.mkdir(new_dir_path)
+
+        old_file_path = os.path.join(unzip_files_path, file_obj)
+        new_file_name = lang_code + file_ext
+        new_file_path = os.path.join(new_dir_path, new_file_name)
+        shutil.move(old_file_path, new_file_path)
+
+
+def read_all_data(clear_path):
+    """
+    读取文件夹中的所有csv文件数据，并归类保存在dict中
+    :param clear_path: 要读取数据的文件夹
+    :return: 归类好的数据
+    """
+
+    result = {}
+    clear_file_list = os.listdir(clear_path)
+    for dir in clear_file_list:
+        print("dir:", dir)
+
+        child_dir_path = os.path.join(clear_path, dir)
+        if os.path.isdir(child_dir_path):
+            result[dir] = {}
+            file_list = os.listdir(child_dir_path)
+            for file_obj in file_list:
+                # print("file_obj:", file_obj)
+                lang_code, file_ext = os.path.splitext(file_obj)
+                # print("lang_code:", lang_code)
+                if file_ext == ".csv":
+                    file_path = os.path.join(child_dir_path, file_obj)
+                    with open(file_path, "r+") as f:
+                        csv_data = csv.reader(f)
+                        data_list = [item[1] for item in csv_data]
+                        result[dir][lang_code] = data_list
+    return result
+
+
+def calc_width(value, font_height):
+    str_val = str(value)
+    num = len(str_val.encode('utf-16')) / 2 - 1
+    #   print('\'%s\'字符个数: %d' % (str_val, num))
+    num *= 2 * font_height / 10.0
+    if num > 40:
+        num = 40
+    return int(num)
+
+
+def gen_excel(data, path):
+    """
+    将数据生成excel
+    :param data: 翻译的数据
+    :param path: excel表格路径
+    :return:
+    """
+
+    wb = openpyxl.Workbook()
+
+    # 删除第一个sheet
+    first_sheet = wb.active
+    wb.remove(first_sheet)
+
+    if 'head_style' not in wb.named_styles:
+        head_style = NamedStyle(name='head_style')
+        head_style.font = Font(name='Helvetica Neue', size=16, bold=True)
+        head_style.alignment = Alignment(horizontal='center', vertical='center')
+        head_style.border = Border(bottom=Side(style=openpyxl.styles.borders.BORDER_THICK))
+        wb.add_named_style(head_style)
+
+    if 'reg_style' not in wb.named_styles:
+        reg_style = NamedStyle(name='reg_style')
+        reg_style.font = Font(name='Helvetica Neue', size=14)
+        reg_style.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        sideline = Side(style=openpyxl.styles.borders.BORDER_THIN)
+        reg_style.border = Border(left=sideline, right=sideline, top=sideline, bottom=sideline)
+        wb.add_named_style(reg_style)
+
+    lang_list = ['cn', 'tw', 'de', 'en', 'es', 'fr', 'id', 'it', 'ja', 'ko', 'pt', 'ru', 'th']
+
+    for sheet_name in data.keys():
+        sheet = wb.create_sheet(sheet_name)
+
+        for i, lang_code in enumerate(lang_list):
+            cur_row = 1
+            cur_col = i + 1
+            cell = sheet.cell(cur_row, cur_col, lang_code)
+            cell.style = 'head_style'
+
+            col_width = 10
+            cur_row = 2
+            if lang_code in data[sheet_name].keys():
+                word_list = data[sheet_name][lang_code]
+                for word in word_list:
+                    cell_len = calc_width(word, 10)
+                    if cell_len > col_width:
+                        col_width = cell_len
+                    cell = sheet.cell(cur_row, cur_col, word)
+                    cell.style = 'reg_style'
+                    cur_row += 1
+
+            col_letter = openpyxl.utils.get_column_letter(cur_col)
+            sheet.column_dimensions[col_letter].width = col_width + 1
+
+    wb.save(path)
+
+
+def main():
+    if len(sys.argv) == 1:
+        print("\t请加上需要处理的文件夹路径")
+        print("\tSuch as : trclr <dir path>")
+        sys.exit(-1)
+
+    if len(sys.argv) == 2:
+        if not os.path.isdir(sys.argv[1]):
+            print("目标路径不是有效的文件夹")
+
+        path_dir = sys.argv[1]
+
+        # 创建文件结构
+        path_dir_clear = os.path.join(path_dir, "clear")
+        if not os.path.isdir(path_dir_clear):
+            os.mkdir(path_dir_clear)
+
+        # 遍历所有zip包
+        file_list = os.listdir(path_dir)
+        for file_name in file_list:
+            if os.path.splitext(file_name)[-1] == '.zip':
+                lang_code = file_name[-6:-4]
+                print('file_name:%s, lang_code:%s' % (file_name, lang_code))
+                zip_path = os.path.join(path_dir, file_name)
+                unzip_dir_path = un_zip(zip_path)
+
+                clear(path_dir_clear, unzip_dir_path, lang_code)
+                os.rmdir(unzip_dir_path)
+
+        # 读取所有内容
+        data = read_all_data(path_dir_clear)
+
+        # 生成excel
+        gen_excel(data, os.path.join(path_dir_clear, 'clear.xlsx'))
+
+
+if __name__ == '__main__':
+    main()

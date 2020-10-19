@@ -1,0 +1,84 @@
+#! /bin/sh
+#将png压缩成pkm或者pvr，pvr.ccz格式
+
+if [[ $1 == "" || $2 == "" ]]; then
+	echo "help:\n\t"$(basename $0)" <source folder> <target filetype>" 
+	exit
+fi
+
+if [[ $2 != "pkm" && $2 != "pvr" && $2 != "pvr.ccz" ]]; then
+	echo "Target filetype is error. Must be one of : pkm/pvr/pvr.ccz"
+	exit
+fi
+
+
+SHELL_FOLDER=$(cd "$(dirname "$0")";pwd)
+
+function convertDir(){
+	srcdir=$1
+	dstdir=${srcdir}"_"$2
+
+	srcfiletype="png"
+	dstfiletype=$2
+
+	if [[ ! -d $dstdir ]]; then
+		mkdir -m 777 -p $dstdir
+	fi
+
+	echo "sourcedir="${srcdir}
+	echo "destdir="${dstdir}
+
+	echo ================
+	#方案4：迭代遍历当前目录下的所有png文件,将其转换成pvr格式，并替换原始文件
+	filelist=`find $srcdir -name \*.$srcfiletype`
+	for in in $filelist; do
+		if [[ $in == *$filetype ]]; then
+			echo ================
+			echo "in  file="$in
+
+			if [[ $dstfiletype == "pkm" ]]; then
+				${SHELL_FOLDER}/etc/etcpack $in $dstdir -c etc1 -ext PNG -as
+			else
+				filename=$(basename $in .png)
+				echo "filename"
+				outpath=${dstdir}/${filename}.${dstfiletype}
+
+				if [[ $dstfiletype == "pvr" ]]; then
+					TexturePacker --format x2d --sheet $outpath  $in  --opt PVRTC4 --dither-fs-alpha  --premultiply-alpha --disable-rotation --size-constraints NPOT --border-padding 0 --shape-padding 0
+				elif [[ $dstfiletype == "pvr.ccz" ]]; then
+					TexturePacker --format x2d --sheet $outpath  $in  --opt PVRTC4  --content-protection b23d9e45bd414cac37ea0e8a9dd6cf9d  --dither-fs-alpha  --premultiply-alpha --disable-rotation --size-constraints NPOT --border-padding 0 --shape-padding 0
+				fi
+			fi
+		fi
+	done
+}
+
+convertPng(){
+	srcfile=$1
+	echo srcfile=$srcfile
+
+	if [[ $2 == "pkm" ]]; then
+		dstdir=$(dirname "$srcfile")
+		echo dstdir=$dstdir
+		${SHELL_FOLDER}/etc/etcpack $srcfile $dstdir -c etc1 -ext PNG -as
+	elif [[ $2 == "pvr" ]]; then
+		dstfile=${srcfile/'png'/${2}}
+		echo dstfile=$dstfile
+		TexturePacker --format x2d --sheet $dstfile  $srcfile  --opt PVRTC4 --dither-fs-alpha  --premultiply-alpha --disable-rotation --size-constraints NPOT --border-padding 0 --shape-padding 0
+	elif [[ $2 == "pvr.ccz" ]]; then
+		dstfile=${srcfile/'png'/${2}}
+		echo dstfile=$dstfile
+		TexturePacker --format x2d --sheet $dstfile  $srcfile  --opt PVRTC4  --content-protection b23d9e45bd414cac37ea0e8a9dd6cf9d  --dither-fs-alpha  --premultiply-alpha --disable-rotation --size-constraints NPOT --border-padding 0 --shape-padding 0
+	fi
+}
+
+if [[ -d $1 ]]; then
+	convertDir $1 $2
+elif [[ -f $1 ]]; then
+	convertPng $1 $2
+fi
+
+
+
+
+

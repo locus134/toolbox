@@ -1,0 +1,133 @@
+#!/usr/local/bin/python3
+# -*- coding: utf-8 -*-
+
+import tinify
+import sys
+import os
+from pyUtils.MultiThread import MultiThread
+
+apiKeys = [
+    'oZLfW3bpk9GmptmDTF15XFzLima0gFDX',
+    '4tKYRxf7oNtVbxJpnGadiTwc2VeMRPB8',
+    'vkLGxNitIb2cq4xhrFDT6Rw7b2qSmy5I'
+]
+
+
+def get_FileSize(filePath):
+    fsize = os.path.getsize(filePath)
+    fsize = fsize / float(1024)
+    return round(fsize, 2)
+
+
+def initTinify():
+    for apiKey in apiKeys:
+        try:
+            tinify.key = apiKey
+            tinify.validate()
+
+            compressions_this_month = tinify.compression_count
+            print("This mouth compression count : %d " % compressions_this_month)
+            break
+        except tinify.Error as e:
+            pass
+        else:
+            pass
+        finally:
+            pass
+
+
+# tinify.key = apiKeys[0]
+# tinify.proxy = "http://user:pass@192.168.1.1:8080"
+
+
+def print_usage():
+    print("python3 %s <origin file or directory> <output file or directory>" % sys.argv[0])
+    print("If outpath is empty, the new files will overwrite the original files.")
+
+
+# 保存文件的原始大小
+src_size_dict = {}
+
+
+def tiny(src, dst):
+    try:
+        src_size = get_FileSize(src)
+        src_size_dict[dst] = src_size
+        print("upload file: {}".format(src))
+        source = tinify.from_file(src)
+        source.to_file(dst)
+        print("save file to {} size:{}kb -> {}kb".format(dst, src_size_dict[dst], get_FileSize(dst)))
+    except tinify.AccountError as e:
+        print("The error message is: %s" % e.message)
+        # Verify your API key and account limit.
+        initTinify()
+        tiny(src, dst)
+    except tinify.ClientError as e:
+        # Check your source image and request options.
+        print("Check your source image and request options.")
+    except tinify.ServerError as e:
+        # Temporary issue with the Tinify API.
+        print('Temporary issue with the Tinify API.')
+    except tinify.ConnectionError as e:
+        # A network connection error occurred.
+        print('A network connection error occurred.')
+    except Exception as e:
+        # Something else went wrong, unrelated to the Tinify API.
+        raise
+    else:
+        pass
+    finally:
+        pass
+
+
+def compress(src, dst):
+    if os.path.isdir(src):
+        mt = MultiThread()
+        g = os.walk(src)
+        for path, dir_list, file_list in g:
+            # print("path:" + path)
+
+            # All child files
+            # for dir_name in dir_list:
+            # print("dir:" + dir_name)
+
+            # All child dirs
+            for file_name in file_list:
+                file_path = os.path.join(path, file_name)
+                # print("file_name:" + file_name + " file_path:" + file_path)
+
+                suffix = os.path.splitext(file_name)[-1]
+                # print('suffix:' + suffix)
+                if suffix == '.jpg' or suffix == '.png':
+                    out_path = file_path.replace(src, dst)
+                    out_dir = os.path.dirname(out_path)
+                    # print('out_path:' + out_path + ", out_dir:" + out_dir)
+                    if not os.path.isdir(out_dir):
+                        os.makedirs(out_dir)
+                    # tiny(file_path, out_path)
+                    mt.addTask(tiny, file_path, out_path)
+            mt.run()
+    elif os.path.isfile(src):
+        tiny(src, dst)
+
+
+def main():
+    initTinify()
+
+    if len(sys.argv) < 2:
+        print_usage()
+        sys.exit(1)
+
+    src_path = sys.argv[1]
+    dst_path = src_path
+    if len(sys.argv) > 2:
+        dst_path = sys.argv[2]
+
+    compress(src_path, dst_path)
+
+    compressions_this_month = tinify.compression_count
+    print("\n This mouth compression count : %d " % compressions_this_month)
+
+
+if __name__ == '__main__':
+    main()

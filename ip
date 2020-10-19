@@ -1,0 +1,9 @@
+#! /bin/sh
+# 连接mac调试，自动获取网络ip
+
+# local_ip=`ifconfig en0 | grep 'inet' | sed 's/^.*inet //g' | sed 's/ *netmask.*$//g'`
+local_ip=`ifconfig en0 | grep 'inet ' | sed 's/^.inet //g' | sed 's/ *netmask.*$//g'`
+if [[ $local_ip == '' ]]; then
+	local_ip=`ifconfig en3 | grep 'inet ' | sed 's/^.inet //g' | sed 's/ *netmask.*$//g'`
+fi
+echo $local_ip

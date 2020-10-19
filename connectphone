@@ -1,0 +1,19 @@
+#! /bin/sh
+# 使用telnet连接手机
+ 
+ip=$1
+port="5678"
+#echo "param len is "$#
+if [[ $# == 2 ]]; then
+	port=$2
+#	echo "port="${port}
+fi
+
+hostIp=`ip`
+# echo hostIp=${hostIp}
+
+network=${hostIp:0:10}
+# echo network:{$network}
+
+echo "nc ip=${network}${ip} port=${port}"
+nc ${network}${ip} $port

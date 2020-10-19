@@ -1,0 +1,155 @@
+#! /bin/sh
+
+usage(){
+cat << EOF
+usage: $0 <version code> <platform> <debug/release>
+	You must install awscil before.
+	
+	<version code> 游戏版本号
+	<platform> 需要提交的平台， ios/android
+	<debug/release>> 资源是用于release(r)版，或者debug(d)版，默认debug(d)
+
+Examples:
+	$0 3.1.0 ios/android r/d
+EOF
+}
+
+# 目标系统
+versionCode=$1
+# 版本号
+platformName=$2
+# debug or release
+variant=$3
+
+
+if [[ "$versionCode" == "" ]]; then
+	usage
+	exit -1
+fi
+
+if [[ "$platformName" == "" ]]; then
+	platformName="all"
+fi
+
+if [[ "$variant" == "" ]]; then
+	variant="d"
+fi
+
+serverDir="rsc2_res"
+if [[ "$variant" == "d" ]]; then
+	serverDir="rsc2_res_debug"
+fi
+
+localRootPath=$(cd `dirname $0`; pwd)
+localRootPath=${localRootPath}"/external"
+
+function submitToLANServer()
+{
+	if [[ "$variant" == "r" ]]; then
+		return
+	fi
+	
+	assetsPlatformName=$1
+
+	if [[ ! -d ${localRootPath}/res ]]; then
+		# echo "createDir:"${localRootPath}/res
+		mkdir ${localRootPath}/res
+	fi
+
+	# 映射服务器资源目录到本地文件夹
+	`mount_smbfs //AS:Ministone2018@192.168.1.8/res/RisingSuperChef2 ${localRootPath}/res`
+
+	srcDir=${localRootPath}/${assetsPlatformName}
+	dstDir=${localRootPath}/res/${versionCode}/${assetsPlatformName}
+	# echo "srcDir="$srcDir
+	# echo "dstDir="$dstDir
+	for file in `find ${srcDir}`; do
+		if [[ -f $file ]]; then
+			targetfile=${file/$srcDir/$dstDir}
+
+			if [[ -f $targetfile ]]; then
+				newmd5=`md5 $targetfile`
+				newmd5=${newmd5##* }
+
+				oldmd5=`md5 $file`
+				oldmd5=${oldmd5##* }
+
+				if [[ "$newmd5" != "$oldmd5" ]]; then
+					echo "change assets : "$targetfile
+					cp -p $file $targetfile
+				fi
+			else
+				# 目标文件所在的目录名
+				targetDir=${targetfile%/*}
+				if [[ ! -d $targetDir ]]; then
+					echo "createDir:"$targetDir
+					mkdir -p $targetDir
+				fi
+				# 拷贝文件到局域网服务器
+				echo "add assets : "$targetfile
+				cp -p $file $targetfile
+			fi
+
+			
+		fi
+	done
+
+	# 关闭映射
+	`umount ${localRootPath}/res`
+
+	`rm -R ${localRootPath}/res`
+}
+
+# 上传资源到S3服务器
+function submitToS3Server()
+{
+	if [[ "$1" != "" ]]; then
+		#statements
+		aws s3 sync ${localRootPath}/"$1" s3://risingsuperchef-userfiles-mobilehub-2105111629/public/${serverDir}/${versionCode}/$1 --acl public-read --delete --exclude "*.DS_Store"
+	fi
+	
+	if [[ "$2" != "" ]]; then
+		#statements
+		aws s3 sync ${localRootPath}/"$2" s3://risingsuperchef-userfiles-mobilehub-2105111629/public/${serverDir}/${versionCode}/$2 --acl public-read --delete --exclude "*.DS_Store"
+	fi
+
+}
+
+# 同步到GoogleCloud
+function submitToGCPServer()
+{
+	if [[ "$1" != "" ]]; then
+		gsutil -m rsync -r -d ${localRootPath}/$1 gs://rising_super_chef2/${serverDir}/${versionCode}/$1
+	fi
+
+	if [[ "$2" != "" ]]; then
+		gsutil -m rsync -r -d ${localRootPath}/$2 gs://rising_super_chef2/${serverDir}/${versionCode}/$2
+	fi
+}
+
+if [[ ${platformName} == "all" ]]; then
+	submitToLANServer	assets_mac
+
+	submitToS3Server assets_ios assets_android
+	aws cloudfront create-invalidation --distribution-id EB2N1ON3REVCK --paths /public/${serverDir}/${versionCode}/*
+
+	submitToGCPServer assets_ios assets_android
+
+elif [[ ${platformName} == "ios" ]]; then
+
+	submitToS3Server assets_ios
+	aws cloudfront create-invalidation --distribution-id EB2N1ON3REVCK --paths /public/${serverDir}/${versionCode}/assets_ios/*
+
+	submitToGCPServer assets_ios
+
+elif [[ ${platformName} == "android" ]]; then
+
+	submitToS3Server assets_android
+	aws cloudfront create-invalidation --distribution-id EB2N1ON3REVCK --paths /public/${serverDir}/${versionCode}/assets_android/*
+
+	submitToGCPServer assets_android
+
+elif [[ ${platformName} == "mac" ]]; then
+	submitToLANServer assets_mac
+fi
+

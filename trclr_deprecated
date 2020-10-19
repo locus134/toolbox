@@ -1,0 +1,78 @@
+#! /bin/sh
+
+usage(){
+cat << EOF
+usage: 处理翻译回来的文档
+
+Examples:
+	unziptr /translations
+EOF
+}
+
+
+
+if [[ ! -d $1 ]]; then
+	usage
+	exit -1
+fi
+
+# 目标文件
+sourcedir=$1
+`cd $sourcedir`
+
+# 去掉文件名中的空格
+for file in ${sourcedir}/*; do
+	filename=${file##*/}
+	echo "$filename"|grep -q " "
+	if [[ $? -eq 0 ]]; then
+		#echo "有空格"
+		newfilename=${filename/\ /\_}
+		`mv -f -v "$file" ${sourcedir}/${newfilename}`
+		echo "rename: { $file } to { ${sourcedir}/${newfilename} } }"
+	fi
+done
+
+tempunzipdir=${sourcedir}/temp
+
+# 遍历目录找出所有zip
+zipList=`find $sourcedir -name \*.zip`
+for zipfile in $zipList; do
+	#echo "zipfile:"$zipfile
+
+	if [[ ! -d $tempunzipdir ]]; then
+		mkdir $tempunzipdir
+	fi
+	`unzip -qo ${zipfile} -d $tempunzipdir`
+#	for unzipfiles in `ls $tempunzipdir`; do
+#		echo "unzipfiles="${tempunzipdir}/$unzipfiles
+#	done
+done
+
+# 将temp中的文件归类
+function reverse()
+{
+	dir=$1
+	for f in ${dir}/*; do
+		if [[ -d $f ]]; then
+			reverse $f
+		elif [[ -f $f ]]; then
+			suffix=${f##*.}
+			filename=$(basename $f)
+			foldername=${filename%.*}
+
+			clearfolder=${sourcedir}/clear/${foldername}
+			if [[ ! -d $clearfolder ]]; then
+				mkdir -p $clearfolder
+			fi
+			newfilename=${f%/*}
+			newfilename=${newfilename##*/}
+			mv -f -v $f ${clearfolder}/${newfilename}.${suffix}
+		fi
+	done
+}
+
+reverse $tempunzipdir
+
+rm -R $tempunzipdir
+
+

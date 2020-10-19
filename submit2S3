@@ -1,0 +1,40 @@
+#! /bin/sh
+
+#文件保存路径根目录
+s3Root=s3://risingsuperchef-userfiles-mobilehub-2105111629/
+
+#要存入的目标文件夹
+targetDir=$1
+
+#要存储的目标文件
+sourceFile=$2
+
+if [[ $targetDir == '' || $sourceFile == '' ]]; then
+	#statements
+	echo "usage: submit2S3 [server target folder] [local source folder]
+for example:
+	submit2S3 public/ad/bundle ~/xxx/localDir"
+	exit
+
+fi
+
+if [[ -f $sourceFile ]]; then
+	sourceFile=${sourceFile%/*}
+fi
+
+# #广告名
+# adName=$1
+# #上传资源目录
+# resourceDir=$2
+
+if [[ $sourceFile != '' ]]; then
+	echo "submit dir:"$sourceFile" to "${s3Root}${targetDir}
+
+	aws s3 sync ${sourceFile} ${s3Root}${targetDir} --acl public-read --delete --exclude "*.DS_Store"
+	aws cloudfront create-invalidation --distribution-id EB2N1ON3REVCK --paths /${targetDir}/*
+fi
+
+
+
+
+# /Users/user/SVN/Chef2/Desgin/广告/PlayableAds/三文治/Sandwich-adconoly/submit.sh Sandwich/js /Users/user/SVN/Chef2/Desgin/广告/PlayableAds/三文治/Sandwich-adconoly/bin-release/web/1.4/js

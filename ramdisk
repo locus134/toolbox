@@ -1,0 +1,7 @@
+#!/bin/bash
+RAMDISK=”ramdisk”
+SIZE=1024*5         #size in MB for ramdisk.
+diskutil erasevolume HFS+ $RAMDISK \
+     `hdiutil attach -nomount ram://$[SIZE*2048]`
+
+mkdir -p/Volumes/ramdisk/Library/Developer/Xcode

@@ -1,0 +1,293 @@
+#!/usr/local/bin/python3
+# -*- coding: UTF-8 -*-
+
+from __future__ import print_function
+import sys
+import os
+import getopt
+import time
+import json
+
+import openpyxl
+from openpyxl.styles import Font, NamedStyle, Alignment, Border, Side, PatternFill
+
+
+def print_usage():
+    print("python3 %s <输入playData.json文件> [-o] <输出xls文件>" % sys.argv[0])
+    print("-o: 指定输出文件路径")
+
+
+def load_json(path):
+    with open(path, 'r', encoding='utf-8') as f:
+        data = json.load(f)
+        f.close()
+        return data
+
+
+def calc_width(value, font_height):
+    str_val = str(value)
+    num = len(str_val.encode('utf-16')) / 2 - 1
+    #   print('\'%s\'字符个数: %d' % (str_val, num))
+    num *= 2 * font_height / 10.0
+    if num > 40:
+        num = 40
+    return int(num)
+
+
+def add_styles(wb):
+    if 'head_style' not in wb.named_styles:
+        head_style = NamedStyle(name='head_style')
+        head_style.font = Font(name='宋体', size=16, bold=True)
+        head_style.alignment = Alignment(horizontal='center', vertical='center')
+        head_style.border = Border(bottom=Side(style=openpyxl.styles.borders.BORDER_THICK))
+        wb.add_named_style(head_style)
+
+    if 'reg_style' not in wb.named_styles:
+        reg_style = NamedStyle(name='reg_style')
+        reg_style.font = Font(name='宋体', size=12)
+        reg_style.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        sideline = Side(style=openpyxl.styles.borders.BORDER_THIN)
+        reg_style.border = Border(left=sideline, right=sideline, top=sideline, bottom=sideline)
+        wb.add_named_style(reg_style)
+
+    if 'reg_style_grey' not in wb.named_styles:
+        reg_style_grey = NamedStyle(name='reg_style_grey')
+        reg_style_grey.font = Font(name='宋体', size=12)
+        reg_style_grey.alignment = Alignment(horizontal='center', vertical='center', wrap_text=True)
+        sideline = Side(style=openpyxl.styles.borders.BORDER_THIN)
+        reg_style_grey.border = Border(left=sideline, right=sideline, top=sideline, bottom=sideline)
+        reg_style_grey.fill = PatternFill('solid', '00D9D9D9')
+        wb.add_named_style(reg_style_grey)
+
+
+def write_game_statistics_sheet(sheet, json_data, key_mapping):
+    col_width = [0]
+    i = 1
+    for vl in key_mapping.values():
+        cell = sheet.cell(1, i, vl)
+        cell.style = 'head_style'
+        i += 1
+        col_width.append(calc_width(vl, 16))
+    cur_line = 2
+
+    grey = False
+    for record in json_data:
+        cellStyle = 'reg_style'
+        if grey:
+            cellStyle = 'reg_style_grey'
+        grey = not grey
+        line_num = 1
+        col = 0
+        for key in key_mapping.keys():
+            col += 1
+            if key in record:
+                vl = record[key]
+                if isinstance(vl, list):
+                    count = len(vl)
+                    if count > 0:
+                        sheet.cell(cur_line, col, vl[0]).style = cellStyle
+                        col_len = calc_width(vl[0], 12)
+                        if col_width[col] < col_len:
+                            col_width[col] = col_len
+                        for i in range(1, count):
+                            sheet.cell(cur_line + i, col, vl[i]).style = cellStyle
+                            col_len = calc_width(vl[i], 12)
+                            if col_width[col] < col_len:
+                                col_width[col] = col_len
+
+                        if count > line_num:
+                            line_num = count
+                    else:
+                        sheet.cell(cur_line, col).style = cellStyle
+                    continue
+            else:
+                vl = ""
+            sheet.cell(cur_line, col, vl).style = cellStyle
+            col_len = calc_width(vl, 12)
+            if col_width[col] < col_len:
+                col_width[col] = col_len
+        # 合并非数组单元格
+        if line_num > 1:
+            col = 0
+            for key in key_mapping.keys():
+                col += 1
+                if key in record and isinstance(record[key], list):
+                    continue
+                else:
+                    sheet.merge_cells(start_row=cur_line, end_row=cur_line + line_num - 1,
+                                      start_column=col, end_column=col)
+                    sheet.cell(cur_line, col).style = cellStyle
+        cur_line += line_num
+    for i in range(1, len(col_width)):
+        if col_width[i] > 10:
+            col_letter = openpyxl.utils.get_column_letter(i)
+            sheet.column_dimensions[col_letter].width = col_width[i] + 1
+
+
+def exportPlayData(path, playRec_jsonData, upgrade_jsonData):
+    wb = openpyxl.Workbook();
+    add_styles(wb)
+
+    recordList = []
+
+    if isinstance(playRec_jsonData, dict):
+        keys = list(playRec_jsonData.keys())
+        keys.sort(key=lambda lv_key: int(lv_key[5:]))
+
+        # length = len(playRec_jsonData)
+        # for i in range(1, length + 1):
+        #     levelKey = 'level{}'.format(i)
+        for levelKey in keys:
+            if levelKey in playRec_jsonData:
+                lv = int(levelKey[5:])
+                record = {'Id': lv, 'PlayScores': [], 'Requirements': [], 'ContinueCount': [], 'ConsumeProps': [], 'ConsumePremiumIngredients': [], 'ServeCustomerCount': [], 'Time': [], 'Coin': [],
+                          'Cash': []}
+                dataList = playRec_jsonData[levelKey]
+                for data in dataList:
+                    record['PlayScores'].append(data['Scores'])
+                    if 'Requirement' in data:
+                        record['Requirements'].append(data['Requirement'])
+                    if 'ContinueCount' in data:
+                        record['ContinueCount'].append(data['ContinueCount'])
+                    if 'ConsumeProps' in data:
+                        record['ConsumeProps'].append(data['ConsumeProps'])
+                    if 'ConsumePremiumIngredients' in data:
+                        record['ConsumePremiumIngredients'].append(data['ConsumePremiumIngredients'])
+                    if 'ServeCustomerCount' in data:
+                        record['ServeCustomerCount'].append(data['ServeCustomerCount'])
+                    if 'Time' in data.keys():
+                        tl = time.localtime(int(data['Time']))
+                        format_time = time.strftime("%Y-%m-%d %H:%M:%S", tl)
+                        record['Time'].append(format_time)
+                    if 'Coin' in data.keys():
+                        record['Coin'].append(data['Coin'])
+                    if 'Cash' in data.keys():
+                        record['Cash'].append(data['Cash'])
+                recordList.append(record)
+
+        keyMapping = {
+            'Id': '关卡ID',
+            'PlayScores': '得分',
+            'Requirements': '条件',
+            'ContinueCount': '继续关卡次数',
+            'ConsumeProps': '消耗道具',
+            'ConsumePremiumIngredients': '消耗有机食材',
+            'ServeCustomerCount': '服务顾客数量',
+            'Coin': 'Coin',
+            'Cash': 'Cash',
+            'Time': '时间',
+        }
+
+        sheet = wb.active
+        sheet.title = '关卡统计'
+        write_game_statistics_sheet(sheet, recordList, keyMapping)
+        sheet.freeze_panes = 'B2'
+
+        # 升级情况
+        if upgrade_jsonData:
+            upgradeList = []
+            for itemName in upgrade_jsonData.keys():
+                itemList = upgrade_jsonData.get(itemName)
+                for up in itemList:
+                    upgrade = {}
+                    upgrade['name'] = itemName
+                    upgrade['upgradeLevel'] = up['upgradeLevel']
+                    upgrade['level'] = up['level']
+                    upgrade['spentCoin'] = up['spentCoin']
+                    upgrade['leftCoin'] = up['leftCoin']
+                    upgrade['spentCash'] = up['spentCash']
+                    upgrade['leftCash'] = up['leftCash']
+                    if 'time' in up:
+                        tl = time.localtime(int(up['time']))
+                        format_time = time.strftime("%Y-%m-%d %H:%M:%S", tl)
+                        upgrade['time'] = format_time
+                    else:
+                        upgrade['time'] = 0
+                    upgradeList.append(upgrade)
+
+            # def takeLevel(ele):
+            #     return ele['level']
+            upgradeList.sort(key=lambda ele: ele['level'])
+
+            keyMapping = {
+                'name': '关卡ID',
+                'level': '当前关卡',
+                'upgradeLevel': '购买等级',
+                'spentCoin': '花费金币',
+                'leftCoin': '剩余金币',
+                'spentCash': '花费Cash',
+                'leftCash': '剩余Cash',
+                'time': '时间'
+            }
+
+            sheet = wb.create_sheet('厨具升级')
+            write_game_statistics_sheet(sheet, upgradeList, keyMapping)
+            sheet.freeze_panes = 'A2'
+            # sheet.cell(1, 1, "项目").style = 'head_style'
+            # sheet.cell(1, 2, "结余").style = 'head_style'
+            # row = 2
+            # items = json_data['items']
+            # for key, val in items.items():
+            #     if key in keyMapping:
+            #         key = keyMapping[key]
+            #     sheet.cell(row, 1, key).style = 'reg_style'
+            #     sheet.cell(row, 2, val).style = 'reg_style'
+            #     row += 1
+            # sheet.freeze_panes = 'A2'
+
+    wb.save(path)
+    print("\033[1;34m已经输出至文件:%s\n\033[0m" % path)
+
+
+def main():
+    if len(sys.argv) < 4:
+        print_usage()
+        sys.exit(1)
+
+    try:
+        opts, args = getopt.getopt(sys.argv[2:], "ho:", ["help", "output="])
+    except getopt.GetoptError as err:
+        # print help information and exit:
+        print(err)  # will print something like "option -a not recognized"
+        print_usage()
+        sys.exit(2)
+
+    jsonPath = sys.argv[1]
+    outPath = None
+
+    for o, a in opts:
+        if o in ("-o", "--output"):
+            outPath = a
+        elif o in ("-h", "--help"):
+            print_usage()
+            sys.exit(0)
+
+    outfile = os.path.splitext(outPath)
+    if not outfile[-1] == '.xlsx':
+        fname = outfile[0]
+    outPath = fname + ".xlsx"
+
+    try:
+        print("\033[1;34m\n开始读取json文件: %s\033[0m" % jsonPath)
+        rootData = load_json(jsonPath)
+    except Exception as e:
+        print('\033[1;31m读取json文件%s出错: %s\033[0m' % (jsonPath, e))
+        sys.exit(1)
+    if rootData is not None:
+        count = len(rootData)
+        if count <= 0:
+            print("\033[1;31m无效的json文件!\033[0m")
+            exit(1)
+        # print('rootData:', rootData)
+        playRecordData = rootData['Level'] if 'Level' in rootData.keys() else None
+        # print('playRecordData:', playRecordData)
+        upgradeData = rootData['Upgrade'] if 'Upgrade' in rootData.keys() else None
+        # print('upgradeData:', upgradeData)
+        exportPlayData(outPath, playRecordData, upgradeData)
+    else:
+        print("\033[1;31m无法读取json文件: %s\033[0m" % jsonPath)
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()

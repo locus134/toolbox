@@ -1,0 +1,14 @@
+#! /bin/sh
+
+# 目标目录
+targetDir=$1
+
+# 文件名
+targetFileName=".DS_Store"
+
+fileList=`find ${targetDir} -name ${targetFileName}`
+for file in $fileList; do
+    echo $file
+    `rm $file`
+done
+

@@ -1,0 +1,17 @@
+#! /bin/sh
+# 连接mac调试，自动获取网络ip
+
+# local_ip=`ifconfig en0 | grep 'inet' | sed 's/^.*inet //g' | sed 's/ *netmask.*$//g'`
+# local_ip=`ifconfig en0 | grep 'inet ' | sed 's/^.inet //g' | sed 's/ *netmask.*$//g'`
+local_ip=`ip`
+echo "local_ip:"$local_ip
+
+port="5678"
+#echo "param len is "$#
+if [[ $# == 1 ]]; then
+	port=$1
+#	echo "port="${port}
+fi
+
+echo "nc ip=${local_ip} port=${port}"
+nc $local_ip $port

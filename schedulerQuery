@@ -1,0 +1,30 @@
+#!/usr/local/bin/python3
+# coding=utf-8
+
+import os
+import datetime
+import sys
+
+from apscheduler.schedulers.blocking import BlockingScheduler
+
+
+def Scheduler():
+    print("Scheduler time:", datetime.datetime.now())
+
+    # 启动脚本时，重定向标准输出：nohup test.py > /dev/null &2 > 1，将错误输出重定向到标准输出上，同时将标准输出重定向到/dev/null上。
+    os.popen('python /Users/user/PycharmProjects/untitled/Analyse/QueryPlayerData.py')
+    # os.popen('python /Users/user/PycharmProjects/untitled/Analyse/QueryPlayerDataByVersion.py')
+
+def main():
+    Scheduler()
+
+    # 创建调度器：BlockingScheduler
+    scheduler = BlockingScheduler()
+    # 添加任务,时间间隔2S
+    scheduler.add_job(Scheduler, 'interval', hours=6, id='queryPlayerData')
+
+    scheduler.start()
+
+
+if __name__ == '__main__':
+    main()

@@ -1,0 +1,60 @@
+#!/bin/sh
+
+usage(){
+	echo "push_obb <版本号> <资源路径>"
+}
+
+curdir=$(dirname "$0")
+version=$1
+
+if [ -z "$version" ];then
+	echo "请输入版本号"
+	usage
+	exit -1
+fi
+
+xfmain=$2
+if [ -z $xfmain ]; then
+	echo "请输入资源路径"
+	usage
+	exit -1
+fi
+
+command -v adb >/dev/null 2>&1 || { echo >&2 "找不到adb命令，请把Android SDK中的adb命令加入到PATH中"; exit 1; }
+
+trim() {
+    # Determine if 'extglob' is currently on.
+    local extglobWasOff=1
+    shopt extglob >/dev/null && extglobWasOff=0 
+    (( extglobWasOff )) && shopt -s extglob # Turn 'extglob' on, if currently turned off.
+    # Trim leading and trailing whitespace
+    local var=$1
+    var=${var##+([[:space:]])}
+    var=${var%%+([[:space:]])}
+    (( extglobWasOff )) && shopt -u extglob # If 'extglob' was off before, turn it back off.
+    echo "$var"  # Output trimmed string.
+}
+
+# local_file="$curdir/build/outputs/expansion/xfmain.zip"
+local_file=$xfmain
+external_storage=$(adb "shell" "echo" "\$EXTERNAL_STORAGE")
+external_storage=$(trim "$external_storage")
+# echo "external_storage=$external_storage"
+
+obb_file="main.$version.com.ministone.game.risingsuperchef2.obb"
+# echo "obb_file=$obb_file"
+
+src_file="$external_storage/$obb_file"
+# echo "src_file:$src_file"
+
+dest_dir="$external_storage/Android/obb/com.ministone.game.risingsuperchef2/"
+# echo "dest_dir:$dest_dir"
+
+#echo "local_file = $local_file"
+#echo "obb_file = $obb_file"
+#echo "src_file = $src_file"
+#echo "dest_dir = $dest_dir"
+
+adb push $local_file $src_file
+adb shell mkdir -p $dest_dir
+adb shell cp $src_file $dest_dir
