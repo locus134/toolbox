@@ -10,13 +10,28 @@ def compress(format, infile, outfile):
     if format == 'pkm':
         outfile = os.path.dirname(outfile)
         command = "etcpack '%s' '%s' -c etc1 -ext PNG -as" % (infile, outfile)
+        os.system(command)
+
+        """
+        # 带透明度的文件命名为name.pkm@alpha
+        (dirpath, filename) = os.path.split(infile)
+        alpha_path = os.path.join(outfile, filename)
+        alpha_path = alpha_path.replace('.png', '_alpha.pkm')
+        if os.path.isfile(alpha_path):
+            new_path = alpha_path.replace('_alpha.pkm', '.pkm@alpha')
+            os.rename(alpha_path, new_path)
+        """
+
     elif format == 'pvr':
         command = "TexturePacker --format x2d '%s' --sheet '%s' --opt PVRTC4 --dither-fs-alpha  --premultiply-alpha --disable-rotation --size-constraints NPOT --border-padding 0 --shape-padding 0" % (
-        infile, outfile)
+            infile, outfile)
+        os.system(command)
+
     elif format == 'pvr.ccz':
-        command = "TexturePacker --format x2d '%s' --sheet '%s'  --opt PVRTC4  --content-protection b23d9e45bd414cac37ea0e8a9dd6cf9d  --dither-fs-alpha  --premultiply-alpha --disable-rotation --size-constraints NPOT --border-padding 0 --shape-padding 0" % (
-        infile, outfile)
-    os.system(command)
+        command = "TexturePacker --format x2d '%s' --sheet '%s'  --opt PVRTC4  --content-protection b23d9e45bd414cac37ea0e8a9dd6cf9d  --dither-fs-alpha  --premultiply-alpha --disable-rotation " \
+                  "--size-constraints NPOT --border-padding 0 --shape-padding 0" % (
+                      infile, outfile)
+        os.system(command)
 
 
 def main():
@@ -34,7 +49,7 @@ def main():
         if not srcAsset[-1] == os.sep:
             srcAsset += os.sep
 
-        if dstAsset == None:
+        if dstAsset is None:
             dstAsset = srcAsset[:-1] + "_" + compressFormat + os.sep
         else:
             if not dstAsset[-1] == os.sep:
@@ -53,7 +68,9 @@ def main():
                     compress(compressFormat, file_path, dst_file_path)
     else:
         file_ext = os.path.splitext(srcAsset)[1]
-        if file_ext == 'png':
+        if file_ext == '.png':
+            if dstAsset is None:
+                dstAsset = os.path.dirname(srcAsset) + os.sep
             compress(compressFormat, infile=srcAsset, outfile=dstAsset)
 
 
